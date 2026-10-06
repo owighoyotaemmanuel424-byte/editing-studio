@@ -45,7 +45,8 @@ async function call<T>(route:string,body?:unknown):Promise<T>{
 async function download(url:string,file:string){
   const response=await fetch(url);
   if(!response.ok||!response.body) throw new Error("Media download failed: "+response.status);
-  await pipeline(response.body,createWriteStream(file));
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  await fs.writeFile(file, bytes);
 }
 
 async function writeText(dir:string,name:string,value:string){
