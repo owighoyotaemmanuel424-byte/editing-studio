@@ -1,7 +1,7 @@
 "use client";
 
 import {useMemo,useRef,useState} from "react";
-import {useMutation} from "convex/react";
+import {useMutation,useQuery} from "convex/react";
 import {api} from "../convex/_generated/api";
 
 type Clip={id:string;start:number;end:number;transition?:Transition};
@@ -17,6 +17,9 @@ export default function Editor(){
   const uploadUrl=useMutation(api.files.generateUploadUrl);
   const attach=useMutation(api.files.attachToProject);
   const attachAudio=useMutation(api.files.attachAudio);
+  const createRender=useMutation(api.renders.create);
+  const [renderId,setRenderId]=useState<string|null>(null);
+  const render=useQuery(api.renders.get,renderId?{id:renderId}:"skip");
 
   const [projectId,setProjectId]=useState<string|null>(null);
   const [videoUrl,setVideoUrl]=useState<string|null>(null);
@@ -129,6 +132,13 @@ export default function Editor(){
     setClips(next);
   }
 
+  async function exportVideo(){
+    if(!projectId) return;
+    setSaved(false);
+    const id=await createRender({projectId,editSpec:JSON.stringify(spec)});
+    setRenderId(id);
+  }
+
   async function saveSpec(){
     if(!projectId) return;
     setSaved(false);
@@ -170,6 +180,8 @@ export default function Editor(){
         <div><div className="text-sm font-bold">NewsCut</div><div className="text-[11px] text-[var(--muted)]">Mobile news video editor</div></div>
         <div className="flex items-center gap-2">
           {saved&&<span className="hidden text-[11px] text-[var(--muted)] sm:inline">Saved</span>}
+          {render&&<span className="hidden text-[11px] text-[var(--muted)] sm:inline">{render.status==="queued"?"Queued":render.status==="processing"?`Rendering ${render.progress}%`:render.status==="ready"?"Ready":"Failed"}</span>}
+          <button onClick={exportVideo} disabled={!projectId||render?.status==="queued"||render?.status==="processing"} className="rounded-xl bg-[var(--accent)] px-4 py-2 text-xs font-bold text-black disabled:opacity-40">Export MP4</button>
           <button onClick={saveSpec} disabled={!projectId} className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-black disabled:opacity-40">Save edit</button>
           <button onClick={()=>createProject({name:headline||"Untitled News Edit",editSpec:JSON.stringify(spec)}).then(setProjectId)} className="rounded-xl border border-[var(--line)] px-4 py-2 text-xs font-bold">New</button>
         </div>
@@ -267,7 +279,7 @@ export default function Editor(){
           {musicUrl&&<audio ref={musicRef} src={musicUrl} controls className="mt-2 w-full"/>}
         </div>
         <label className="flex cursor-pointer items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-bold text-black">{busy?"Uploading…":"Replace / upload video"}<input className="hidden" type="file" accept="video/*" disabled={busy} onChange={e=>e.target.files?.[0]&&upload(e.target.files[0])}/></label>
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 text-xs leading-5 text-[var(--muted)]"><div className="mb-1 font-bold text-white">Editor status</div>Multi-clip editing, timed captions, manual transitions, lower-thirds, voice-over and background music are active. MP4 rendering is next.</div>
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 text-xs leading-5 text-[var(--muted)]"><div className="mb-1 font-bold text-white">Export</div>{render?.status==="queued"&&"Your edit is queued for the render worker."}{render?.status==="processing"&&`Rendering your MP4… ${render.progress}%`}{render?.status==="failed"&&`Render failed: ${render.error??"Unknown error"}`}{render?.status==="ready"&&"MP4 render is ready. The worker output will be attached to this render job."}{!render&&"Save your edit, then export it as an MP4 render job."}</div>
       </aside>
     </section>
   </main>;
