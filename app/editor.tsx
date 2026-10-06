@@ -20,6 +20,7 @@ export default function Editor(){
   const createRender=useMutation(api.renders.create);
   const [renderId,setRenderId]=useState<string|null>(null);
   const render=useQuery(api.renders.get,renderId?{id:renderId}:"skip");
+  const outputUrl=useQuery(api.renders.outputUrl,renderId?{id:renderId}:"skip");
 
   const [projectId,setProjectId]=useState<string|null>(null);
   const [videoUrl,setVideoUrl]=useState<string|null>(null);
@@ -279,7 +280,7 @@ export default function Editor(){
           {musicUrl&&<audio ref={musicRef} src={musicUrl} controls className="mt-2 w-full"/>}
         </div>
         <label className="flex cursor-pointer items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-bold text-black">{busy?"Uploading…":"Replace / upload video"}<input className="hidden" type="file" accept="video/*" disabled={busy} onChange={e=>e.target.files?.[0]&&upload(e.target.files[0])}/></label>
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 text-xs leading-5 text-[var(--muted)]"><div className="mb-1 font-bold text-white">Export</div>{render?.status==="queued"&&"Your edit is queued for the render worker."}{render?.status==="processing"&&`Rendering your MP4… ${render.progress}%`}{render?.status==="failed"&&`Render failed: ${render.error??"Unknown error"}`}{render?.status==="ready"&&"MP4 render is ready. The worker output will be attached to this render job."}{!render&&"Save your edit, then export it as an MP4 render job."}</div>
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 text-xs leading-5 text-[var(--muted)]"><div className="mb-1 font-bold text-white">Export</div>{render?.status==="queued"&&"Your edit is queued for the render worker."}{render?.status==="processing"&&`Rendering your MP4… ${render.progress}%`}{render?.status==="failed"&&`Render failed: ${render.error??"Unknown error"}`}{render?.status==="ready"&&<>{outputUrl?<a href={outputUrl} target="_blank" rel="noreferrer" className="font-bold text-white underline">Download MP4</a>:"MP4 render is ready; preparing download link."}</>}{!render&&"Save your edit, then export it as an MP4 render job."}</div>
       </aside>
     </section>
   </main>;
