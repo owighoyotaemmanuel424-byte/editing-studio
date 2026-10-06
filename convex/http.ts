@@ -1,6 +1,7 @@
 import { httpAction } from "./_generated/server";
 import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 const http = httpRouter();
 
@@ -29,7 +30,7 @@ const progress = httpAction(async (ctx, request) => {
   const body = await request.json() as { renderId?: string; progress?: number };
   if (!body.renderId || typeof body.progress !== "number") return json({ error: "renderId and progress are required" }, 400);
   await ctx.runMutation(internal.renders.setProgress, {
-    id: body.renderId as never,
+    id: body.renderId as Id<"renders">,
     progress: body.progress,
   });
   return json({ ok: true });
@@ -41,7 +42,7 @@ const complete = httpAction(async (ctx, request) => {
   if (!body.renderId || !body.outputStorageId) return json({ error: "renderId and outputStorageId are required" }, 400);
   await ctx.runMutation(internal.renders.setReady, {
     id: body.renderId as never,
-    outputStorageId: body.outputStorageId as never,
+    outputStorageId: body.outputStorageId as Id<"_storage">,
   });
   return json({ ok: true });
 });
