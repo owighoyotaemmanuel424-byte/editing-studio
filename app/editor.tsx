@@ -4,7 +4,9 @@ import {useMemo,useRef,useState} from "react";
 import {useMutation} from "convex/react";
 import {api} from "../convex/_generated/api";
 
-type Clip={id:string;start:number;end:number};
+type Clip={id:string;start:number;end:number;transition?:Transition};
+type Transition="cut"|"fade"|"slide";
+type Caption={id:string;start:number;end:number;text:string};
 
 const templates=[["breaking","Breaking News"],["report","News Report"],["documentary","Documentary"]];
 
@@ -25,6 +27,7 @@ export default function Editor(){
   const [sourceDuration,setSourceDuration]=useState(45);
   const [clips,setClips]=useState<Clip[]>([{id:"clip-1",start:0,end:45}]);
   const [caption,setCaption]=useState("Add your caption");
+  const [captions,setCaptions]=useState<Caption[]>([{id:"caption-1",start:0,end:45,text:"Add your caption"}]);
   const [source,setSource]=useState("Source: Add your source");
   const [busy,setBusy]=useState(false);
   const [saved,setSaved]=useState(false);
@@ -55,10 +58,10 @@ export default function Editor(){
     breaking:template==="breaking",
     sourceLabel:source,
     clips,
-    captions:[{start:0,end:totalDuration,text:caption}],
+    captions:captions.map(({id,...item})=>item),
     lowerThird:{enabled:true,text:source},
     audio:{voiceover:voiceUrl?{enabled:true,volume:voiceVolume}:null,music:musicUrl?{enabled:true,volume:musicVolume}:null}
-  }),[totalDuration,duration,headline,template,source,clips,caption,voiceUrl,musicUrl,voiceVolume,musicVolume]);
+  }),[totalDuration,duration,headline,template,source,clips,captions,voiceUrl,musicUrl,voiceVolume,musicVolume]);
 
   function projectToSource(projectTime:number){
     let cursor=0;
@@ -90,7 +93,9 @@ export default function Editor(){
     const local=time-cursor;
     const cut=Math.max(clip.start+0.1,Math.min(clip.end-0.1,clip.start+local));
     if(cut<=clip.start||cut>=clip.end) return;
-    setClips([...clips.slice(0,index),{id:clip.id+"-a",start:clip.start,end:cut},{id:clip.id+"-b",start:cut,end:clip.end},...clips.slice(index+1)]);
+    const next=[...clips.slice(0,index),{id:clip.id+"-a",start:clip.start,end:cut,transition:clip.transition},{id:clip.id+"-b",start:cut,end:clip.end,transition:clip.transition},...clips.slice(index+1)];
+    setClips(next);
+    setCaptions(prev=>prev.map(c=>c));
   }
 
   function deleteClip(index:number){
@@ -99,6 +104,22 @@ export default function Editor(){
     setClips(next);
     setTime(Math.min(time,next.reduce((s,c)=>s+c.end-c.start,0)));
   }
+
+  function setTransition(index:number,transition:Transition){
+    setClips(prev=>prev.map((clip,i)=>i===index?{...clip,transition}:clip));
+  }
+
+  function addCaption(){
+    const start=Math.max(0,Math.min(time,totalDuration));
+    const end=Math.min(totalDuration,Math.max(start+1,start+3));
+    setCaptions(prev=>[...prev,{id:"caption-"+Date.now(),start,end,text:"New caption"}]);
+  }
+
+  function updateCaption(id:string,key:"start"|"end"|"text",value:string){
+    setCaptions(prev=>prev.map(c=>c.id===id?(key==="text"?{...c,text:value}:{...c,[key]:Number(value)}):c));
+  }
+
+  function deleteCaption(id:string){setCaptions(prev=>prev.filter(c=>c.id!==id));}
 
   function moveClip(index:number,direction:-1|1){
     const target=index+direction;
@@ -124,8 +145,8 @@ export default function Editor(){
       const data=await r.json();
       const id=projectId??await createProject({name:file.name.replace(/\.[^.]+$/,""),editSpec:JSON.stringify(spec)});
       setProjectId(id);
-      const attached=await attach({projectId:id,storageId:data.storageId,filename:file.name,mimeType:file.type});
-      setVideoUrl(attached.url);
+      const attached=await attachAudio({projectId:id,storageId:data.storageId,filename:file.name,mimeType:file.type,kind,volume:kind==="voiceover"?voiceVolume:musicVolume});
+      if(kind==="voiceover") setVoiceUrl(attached.url); else setMusicUrl(attached.url);
     }finally{setBusy(false)}
   }
 
@@ -206,6 +227,10 @@ export default function Editor(){
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4"><div className="mb-3 text-sm font-bold">Caption</div><textarea value={caption} onChange={e=>setCaption(e.target.value)} maxLength={180} rows={3} className="w-full resize-none rounded-xl border border-[var(--line)] bg-[var(--panel2)] px-3 py-3 text-sm outline-none focus:border-white"/><div className="mt-2 text-[11px] text-[var(--muted)]">{caption.length}/180</div></div>
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4"><div className="mb-3 text-sm font-bold">Source / lower third</div><input value={source} onChange={e=>setSource(e.target.value)} maxLength={80} className="w-full rounded-xl border border-[var(--line)] bg-[var(--panel2)] px-3 py-3 text-sm outline-none focus:border-white"/></div>
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+          <div className="mb-3 flex items-center justify-between"><div className="text-sm font-bold">Caption track</div><button onClick={addCaption} className="rounded-lg bg-white px-3 py-2 text-[10px] font-bold text-black">Add caption</button></div>
+          <div className="grid gap-3">{captions.map(c=><div key={c.id} className="rounded-xl border border-[var(--line)] bg-[var(--panel2)] p-3"><div className="grid grid-cols-2 gap-2"><input type="number" min="0" max={totalDuration} step=".1" value={c.start} onChange={e=>updateCaption(c.id,"start",e.target.value)} className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-2 py-2 text-[10px]"/><input type="number" min="0" max={totalDuration} step=".1" value={c.end} onChange={e=>updateCaption(c.id,"end",e.target.value)} className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-2 py-2 text-[10px]"/></div><textarea value={c.text} onChange={e=>updateCaption(c.id,"text",e.target.value)} rows={2} className="mt-2 w-full resize-none rounded-lg border border-[var(--line)] bg-[var(--panel)] px-2 py-2 text-xs"/><button onClick={()=>deleteCaption(c.id)} className="mt-2 text-[10px] font-bold text-[var(--muted)]">Remove</button></div>)}</div>
+        </div>
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
           <div className="mb-3 text-sm font-bold">Audio</div>
           <div className="grid gap-2">
             <label className="flex cursor-pointer items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--panel2)] px-3 py-3 text-xs font-semibold">{voiceUrl?"Replace voice-over":"Add voice-over"}<input className="hidden" type="file" accept="audio/*" disabled={busy} onChange={e=>e.target.files?.[0]&&uploadAudio(e.target.files[0],"voiceover")}/></label>
@@ -219,7 +244,7 @@ export default function Editor(){
           {musicUrl&&<audio ref={musicRef} src={musicUrl} controls className="mt-2 w-full"/>}
         </div>
         <label className="flex cursor-pointer items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-bold text-black">{busy?"Uploading…":"Replace / upload video"}<input className="hidden" type="file" accept="video/*" disabled={busy} onChange={e=>e.target.files?.[0]&&upload(e.target.files[0])}/></label>
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 text-xs leading-5 text-[var(--muted)]"><div className="mb-1 font-bold text-white">Editor status</div>Multi-clip timeline, split, reorder, delete, headlines, captions, lower-thirds, voice-over and background music are active. Transitions and MP4 rendering are next.</div>
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 text-xs leading-5 text-[var(--muted)]"><div className="mb-1 font-bold text-white">Editor status</div>Multi-clip editing, timed captions, manual transitions, lower-thirds, voice-over and background music are active. MP4 rendering is next.</div>
       </aside>
     </section>
   </main>;
