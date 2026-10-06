@@ -14,6 +14,7 @@ export default function Editor(){
   const updateSpec=useMutation(api.projects.updateSpec);
   const uploadUrl=useMutation(api.files.generateUploadUrl);
   const attach=useMutation(api.files.attachToProject);
+  const attachAudio=useMutation(api.files.attachAudio);
 
   const [projectId,setProjectId]=useState<string|null>(null);
   const [videoUrl,setVideoUrl]=useState<string|null>(null);
@@ -27,6 +28,12 @@ export default function Editor(){
   const [source,setSource]=useState("Source: Add your source");
   const [busy,setBusy]=useState(false);
   const [saved,setSaved]=useState(false);
+  const [voiceUrl,setVoiceUrl]=useState<string|null>(null);
+  const [musicUrl,setMusicUrl]=useState<string|null>(null);
+  const [voiceVolume,setVoiceVolume]=useState(1);
+  const [musicVolume,setMusicVolume]=useState(.25);
+  const voiceRef=useRef<HTMLAudioElement>(null);
+  const musicRef=useRef<HTMLAudioElement>(null);
 
   const totalDuration=useMemo(()=>clips.reduce((sum,c)=>sum+Math.max(0,c.end-c.start),0),[clips]);
   const activeClip=useMemo(()=>{
@@ -49,8 +56,9 @@ export default function Editor(){
     sourceLabel:source,
     clips,
     captions:[{start:0,end:totalDuration,text:caption}],
-    lowerThird:{enabled:true,text:source}
-  }),[totalDuration,duration,headline,template,source,clips,caption]);
+    lowerThird:{enabled:true,text:source},
+    audio:{voiceover:voiceUrl?{enabled:true,volume:voiceVolume}:null,music:musicUrl?{enabled:true,volume:musicVolume}:null}
+  }),[totalDuration,duration,headline,template,source,clips,caption,voiceUrl,musicUrl,voiceVolume,musicVolume]);
 
   function projectToSource(projectTime:number){
     let cursor=0;
@@ -107,7 +115,7 @@ export default function Editor(){
     setSaved(true);
   }
 
-  async function upload(file:File){
+  async function uploadAudio(file:File,kind:"voiceover"|"music"){
     setBusy(true);
     try{
       const url=await uploadUrl();
@@ -197,8 +205,21 @@ export default function Editor(){
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4"><div className="mb-3 text-sm font-bold">Headline</div><input value={headline} onChange={e=>setHeadline(e.target.value)} maxLength={90} className="w-full rounded-xl border border-[var(--line)] bg-[var(--panel2)] px-3 py-3 text-sm outline-none focus:border-white"/><div className="mt-2 text-[11px] text-[var(--muted)]">{headline.length}/90</div></div>
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4"><div className="mb-3 text-sm font-bold">Caption</div><textarea value={caption} onChange={e=>setCaption(e.target.value)} maxLength={180} rows={3} className="w-full resize-none rounded-xl border border-[var(--line)] bg-[var(--panel2)] px-3 py-3 text-sm outline-none focus:border-white"/><div className="mt-2 text-[11px] text-[var(--muted)]">{caption.length}/180</div></div>
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4"><div className="mb-3 text-sm font-bold">Source / lower third</div><input value={source} onChange={e=>setSource(e.target.value)} maxLength={80} className="w-full rounded-xl border border-[var(--line)] bg-[var(--panel2)] px-3 py-3 text-sm outline-none focus:border-white"/></div>
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+          <div className="mb-3 text-sm font-bold">Audio</div>
+          <div className="grid gap-2">
+            <label className="flex cursor-pointer items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--panel2)] px-3 py-3 text-xs font-semibold">{voiceUrl?"Replace voice-over":"Add voice-over"}<input className="hidden" type="file" accept="audio/*" disabled={busy} onChange={e=>e.target.files?.[0]&&uploadAudio(e.target.files[0],"voiceover")}/></label>
+            <label className="flex cursor-pointer items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--panel2)] px-3 py-3 text-xs font-semibold">{musicUrl?"Replace background music":"Add background music"}<input className="hidden" type="file" accept="audio/*" disabled={busy} onChange={e=>e.target.files?.[0]&&uploadAudio(e.target.files[0],"music")}/></label>
+          </div>
+          <div className="mt-4 space-y-3">
+            <label className="block text-[10px] font-bold uppercase text-[var(--muted)]">Voice volume <input className="mt-2 w-full" type="range" min="0" max="1" step=".05" value={voiceVolume} onChange={e=>{const v=Number(e.target.value);setVoiceVolume(v);if(voiceRef.current)voiceRef.current.volume=v}}/></label>
+            <label className="block text-[10px] font-bold uppercase text-[var(--muted)]">Music volume <input className="mt-2 w-full" type="range" min="0" max=".8" step=".05" value={musicVolume} onChange={e=>{const v=Number(e.target.value);setMusicVolume(v);if(musicRef.current)musicRef.current.volume=v}}/></label>
+          </div>
+          {voiceUrl&&<audio ref={voiceRef} src={voiceUrl} controls className="mt-3 w-full"/>}
+          {musicUrl&&<audio ref={musicRef} src={musicUrl} controls className="mt-2 w-full"/>}
+        </div>
         <label className="flex cursor-pointer items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-bold text-black">{busy?"Uploading…":"Replace / upload video"}<input className="hidden" type="file" accept="video/*" disabled={busy} onChange={e=>e.target.files?.[0]&&upload(e.target.files[0])}/></label>
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 text-xs leading-5 text-[var(--muted)]"><div className="mb-1 font-bold text-white">Editor status</div>Multi-clip timeline, split, reorder, delete, 9:16 preview, headlines, captions, lower-thirds and persistent Convex edit specs are active. Audio tracks, transitions and MP4 rendering are next.</div>
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 text-xs leading-5 text-[var(--muted)]"><div className="mb-1 font-bold text-white">Editor status</div>Multi-clip timeline, split, reorder, delete, headlines, captions, lower-thirds, voice-over and background music are active. Transitions and MP4 rendering are next.</div>
       </aside>
     </section>
   </main>;
