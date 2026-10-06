@@ -36,19 +36,21 @@ export default function Editor(){
       if(time<=cursor+length) return {clip,offset:Math.max(0,time-cursor)};
       cursor+=length;
     }
-    return clips[clips.length-1]?{clip:clips[clips.length-1],offset:Math.max(0,clips[clips.length-1].end-clips[clips.length-1].start)}:null;
+    const last=clips[clips.length-1];
+    return last?{clip:last,offset:Math.max(0,last.end-last.start)}:null;
   },[clips,time]);
 
   const spec=useMemo(()=>({
     format:"9:16",
     duration:Math.round(totalDuration*10)/10,
+    targetDuration:duration,
     headline,
     breaking:template==="breaking",
     sourceLabel:source,
     clips,
     captions:[{start:0,end:totalDuration,text:caption}],
     lowerThird:{enabled:true,text:source}
-  }),[totalDuration,headline,template,source,clips,caption]);
+  }),[totalDuration,duration,headline,template,source,clips,caption]);
 
   function projectToSource(projectTime:number){
     let cursor=0;
@@ -57,8 +59,7 @@ export default function Editor(){
       if(projectTime<=cursor+length) return clip.start+Math.max(0,projectTime-cursor);
       cursor+=length;
     }
-    const last=clips[clips.length-1];
-    return last?.end??0;
+    return clips[clips.length-1]?.end??0;
   }
 
   function seek(v:number){
@@ -72,7 +73,7 @@ export default function Editor(){
     let cursor=0;
     const index=clips.findIndex(c=>{
       const length=c.end-c.start;
-      const hit=time>=cursor && time<=cursor+length;
+      const hit=time>=cursor&&time<=cursor+length;
       if(!hit) cursor+=length;
       return hit;
     });
@@ -81,8 +82,7 @@ export default function Editor(){
     const local=time-cursor;
     const cut=Math.max(clip.start+0.1,Math.min(clip.end-0.1,clip.start+local));
     if(cut<=clip.start||cut>=clip.end) return;
-    const next=[...clips.slice(0,index),{id:clip.id+"-a",start:clip.start,end:cut},{id:clip.id+"-b",start:cut,end:clip.end},...clips.slice(index+1)];
-    setClips(next);
+    setClips([...clips.slice(0,index),{id:clip.id+"-a",start:clip.start,end:cut},{id:clip.id+"-b",start:cut,end:clip.end},...clips.slice(index+1)]);
   }
 
   function deleteClip(index:number){
@@ -148,15 +148,14 @@ export default function Editor(){
                 onTimeUpdate={e=>{
                   if(!activeClip) return;
                   const sourceTime=e.currentTarget.currentTime;
-                  const projectTime=clips.reduce((cursor,c)=>{
-                    if(c.id===activeClip.clip.id) return cursor+Math.max(0,sourceTime-c.start);
-                    return cursor+(c.end-c.start);
-                  },0);
+                  const index=clips.findIndex(c=>c.id===activeClip.clip.id);
+                  const before=clips.slice(0,index).reduce((sum,c)=>sum+c.end-c.start,0);
+                  const projectTime=before+Math.max(0,sourceTime-activeClip.clip.start);
                   if(sourceTime>=activeClip.clip.end-0.03){
                     const next=projectTime+0.05;
                     if(next<totalDuration) seek(next);
-                    else e.currentTarget.pause();
-                  } else setTime(Math.min(projectTime,totalDuration));
+                    else{setTime(totalDuration);e.currentTarget.pause();}
+                  }else setTime(Math.min(projectTime,totalDuration));
                 }}
                 className="h-full w-full object-cover"/>
               :
