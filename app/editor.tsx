@@ -3,6 +3,7 @@
 import {useMemo,useRef,useState} from "react";
 import {useMutation,useQuery} from "convex/react";
 import {api} from "../convex/_generated/api";
+import type {Id} from "../convex/_generated/dataModel";
 
 type Clip={id:string;start:number;end:number;transition?:Transition};
 type Transition="cut"|"fade"|"slide";
@@ -18,11 +19,11 @@ export default function Editor(){
   const attach=useMutation(api.files.attachToProject);
   const attachAudio=useMutation(api.files.attachAudio);
   const createRender=useMutation(api.renders.create);
-  const [renderId,setRenderId]=useState<string|null>(null);
+  const [renderId,setRenderId]=useState<Id<"renders">|null>(null);
   const render=useQuery(api.renders.get,renderId?{id:renderId}:"skip");
   const outputUrl=useQuery(api.renders.outputUrl,renderId?{id:renderId}:"skip");
 
-  const [projectId,setProjectId]=useState<string|null>(null);
+  const [projectId,setProjectId]=useState<Id<"projects">|null>(null);
   const [videoUrl,setVideoUrl]=useState<string|null>(null);
   const [headline,setHeadline]=useState("Major Development Reported");
   const [template,setTemplate]=useState("breaking");
