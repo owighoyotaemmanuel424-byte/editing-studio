@@ -128,7 +128,7 @@ async function render(job:Job,uploadUrl:string){
     else args.push("-an");
 
     const duration=clips.reduce((sum,c)=>sum+Math.max(0,c.end-c.start),0);
-    args.push("-t",String(Math.max(.1,duration),"-c:v","libx264","-preset",process.env.FFMPEG_PRESET??"veryfast","-crf",process.env.FFMPEG_CRF??"21","-r","30","-pix_fmt","yuv420p","-movflags","+faststart");
+    args.push("-t",String(Math.max(.1,duration)),"-c:v","libx264","-preset",process.env.FFMPEG_PRESET??"veryfast","-crf",process.env.FFMPEG_CRF??"21","-r","30","-pix_fmt","yuv420p","-movflags","+faststart");
     if(audioLabels.length) args.push("-c:a","aac","-b:a","128k");
     args.push("-progress","pipe:2",output);
 
