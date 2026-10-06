@@ -136,6 +136,20 @@ export default function Editor(){
     setSaved(true);
   }
 
+  async function upload(file:File){
+    setBusy(true);
+    try{
+      const url=await uploadUrl();
+      const r=await fetch(url,{method:"POST",headers:{"Content-Type":file.type},body:file});
+      if(!r.ok) throw new Error("Upload failed");
+      const data=await r.json();
+      const id=projectId??await createProject({name:file.name.replace(/\.[^.]+$/,""),editSpec:JSON.stringify(spec)});
+      setProjectId(id);
+      const attached=await attach({projectId:id,storageId:data.storageId,filename:file.name,mimeType:file.type});
+      setVideoUrl(attached.url);
+    }finally{setBusy(false)}
+  }
+
   async function uploadAudio(file:File,kind:"voiceover"|"music"){
     setBusy(true);
     try{
@@ -218,6 +232,15 @@ export default function Editor(){
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2">{[30,45,60].map(s=><button key={s} onClick={()=>setDuration(s)} className={"rounded-lg border px-3 py-2 text-xs "+(duration===s?"border-white bg-white text-black":"border-[var(--line)] bg-[var(--panel2)]")}>{s}s target</button>)}</div>
           <div className="mt-2 text-[10px] text-[var(--muted)]">Source: {sourceDuration.toFixed(1)}s • {clips.length} clip{clips.length===1?"":"s"}</div>
+          <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--panel2)] p-3">
+            <div className="mb-2 text-xs font-bold">Transitions</div>
+            <div className="grid gap-2">{clips.map((clip,index)=><div key={"transition-"+clip.id} className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-[var(--muted)]">After clip {index+1}</span>
+              <select value={clip.transition??"cut"} onChange={e=>setTransition(index,e.target.value as Transition)} disabled={index===clips.length-1} className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-2 py-1 text-[10px] disabled:opacity-40">
+                <option value="cut">Cut</option><option value="fade">Fade</option><option value="slide">Slide</option>
+              </select>
+            </div>)}</div>
+          </div>
         </div>
       </div>
 
