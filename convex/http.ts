@@ -41,7 +41,7 @@ const complete = httpAction(async (ctx, request) => {
   const body = await request.json() as { renderId?: string; outputStorageId?: string };
   if (!body.renderId || !body.outputStorageId) return json({ error: "renderId and outputStorageId are required" }, 400);
   await ctx.runMutation(internal.renders.setReady, {
-    id: body.renderId as never,
+    id: body.renderId as Id<"renders">,
     outputStorageId: body.outputStorageId as Id<"_storage">,
   });
   return json({ ok: true });
