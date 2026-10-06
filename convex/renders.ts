@@ -68,3 +68,12 @@ export const setReady=mutation({
     return null;
   }
 });
+export const outputUrl=query({
+  args:{id:v.id("renders")},
+  returns:v.union(v.null(),v.string()),
+  handler:async(ctx,args)=>{
+    const render=await ctx.db.get(args.id);
+    if(!render?.outputStorageId) return null;
+    return await ctx.storage.getUrl(render.outputStorageId);
+  }
+});
